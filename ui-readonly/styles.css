@@ -1,0 +1,289 @@
+:root {
+  --bg: #f5f6f8;
+  --panel: #ffffff;
+  --text: #1a1d21;
+  --muted: #6b7280;
+  --border: #d9dee7;
+  --primary: #0f766e;
+  --primary-dark: #0d5f59;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  color: var(--text);
+  background: linear-gradient(180deg, #eef4f8 0%, var(--bg) 45%);
+}
+
+.page-header {
+  padding: 24px 28px 10px;
+}
+
+.page-header h1 {
+  margin: 0;
+  font-size: 28px;
+}
+
+.api-version {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.container {
+  padding: 0 24px 24px;
+  display: grid;
+  gap: 16px;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.panel h2 {
+  margin: 0 0 14px;
+  font-size: 20px;
+}
+
+.toolbar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.toolbar input {
+  flex: 1 1 300px;
+  min-width: 240px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+}
+
+.toolbar select {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+  background: #fff;
+  color: var(--text);
+}
+
+.toolbar button {
+  border: none;
+  border-radius: 8px;
+  padding: 10px 14px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.toolbar button:hover {
+  background: var(--primary-dark);
+}
+
+.toolbar .ghost {
+  background: #5b6472;
+}
+
+.sort-btn {
+  border: none;
+  background: transparent;
+  color: #4b5563;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0;
+  font-weight: 700;
+}
+
+.sort-btn.active {
+  color: var(--primary-dark);
+}
+
+.status-bar {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 10px 0;
+}
+
+.status-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 6px 0 12px;
+}
+
+.status-stat-item {
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: #334155;
+}
+
+.status-stat-item strong {
+  font-size: 14px;
+  margin-left: 4px;
+}
+
+.table-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 960px;
+}
+
+th,
+td {
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  padding: 10px 8px;
+  vertical-align: top;
+  font-size: 13px;
+}
+
+th {
+  font-size: 12px;
+  color: #4b5563;
+  white-space: nowrap;
+}
+
+tbody tr {
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+tbody tr:hover {
+  background: #f1f8f7;
+}
+
+tbody tr.active {
+  background: #e9f5f3;
+}
+
+.status-badge {
+  display: inline-block;
+  border-radius: 999px;
+  font-size: 12px;
+  padding: 2px 8px;
+  line-height: 1.4;
+}
+
+.status-0 {
+  background: #fff4db;
+  color: #8a5a00;
+}
+
+.status-1 {
+  background: #ddf6e9;
+  color: #0f5132;
+}
+
+.status-2 {
+  background: #e8edf7;
+  color: #334155;
+}
+
+.status-3 {
+  background: #fde8e8;
+  color: #9b1c1c;
+}
+
+.status-4 {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.pager {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pager button {
+  border: none;
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: #5b6472;
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.pager button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+#pageInfo {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.empty {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.hidden {
+  display: none;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px 16px;
+  margin-bottom: 14px;
+}
+
+.label {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.value {
+  margin-top: 2px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 14px;
+}
+
+.code-list-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  margin-top: 10px;
+}
+
+.code-list-title {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+
+@media (max-width: 768px) {
+  .page-header {
+    padding: 18px 16px 8px;
+  }
+
+  .container {
+    padding: 0 12px 16px;
+  }
+
+  .panel {
+    padding: 12px;
+  }
+}

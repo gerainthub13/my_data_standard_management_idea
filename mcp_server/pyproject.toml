@@ -1,0 +1,17 @@
+[project]
+name = "dsms-mcp-server"
+version = "0.1.0"
+description = "MCP Server for DSMS (Data Standard Management System)"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "mcp[cli]>=1.6.0",
+    "httpx>=0.27.0",
+]
+
+[project.scripts]
+dsms-mcp = "mcp_server.server:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

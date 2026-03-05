@@ -1,0 +1,23 @@
+# DSMS MCP Server — 配置文件
+# 本文件是 MCP Server 的唯一配置来源，不使用环境变量。
+
+[api]
+# DSMS 后端 API 的根地址
+base_url = "http://127.0.0.1:8000"
+# API 请求超时秒数
+timeout_seconds = 30
+
+[server]
+# MCP Server 标识名称（在 LLM 客户端配置中显示）
+name = "dsms-mcp-server"
+version = "0.1.0"
+# 默认语言，用于向量搜索等需要指定语言的接口
+default_language = "zh"
+# 传输方式：sse（默认）或 stdio
+# 启动时可用 --transport 命令行参数覆盖
+transport = "sse"
+
+[sse]
+# SSE 传输时监听的 host 和 port
+host = "127.0.0.1"
+port = 9000

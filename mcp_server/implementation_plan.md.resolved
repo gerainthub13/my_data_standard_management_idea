@@ -1,0 +1,222 @@
+# MCP Server for DSMS — Implementation Plan
+
+## 背景与目标
+
+DSMS 项目（Data Standard Management System）已有完整的 FastAPI 后端 API。本计划在项目中新增一个 `mcp_server/` Python 包，以独立服务形式运行，通过 MCP 协议向 LLM 暴露所有数据标准管理能力。
+
+**关键设计原则：**
+- 独立部署，不依赖主项目运行时（通过 HTTP 调用 DSMS API）
+- 配置完全使用独立 TOML 文件，不使用环境变量
+- 工具说明极度详细，帮助 LLM 推断工具调用顺序和正确场景
+- 支持 stdio 传输（主流 LLM 客户端配置方式）
+
+---
+
+## User Review Required
+
+> [!IMPORTANT]
+> **工具覆盖范围**：本计划覆盖"查询类"和"管理类"全部工具。写操作（创建/更新/删除）也会实现，请确认是否需要限制只读模式或加权限控制。
+
+> [!NOTE]
+> **MCP SDK**：使用官方 `mcp` Python SDK（`mcp[cli]`）。该 SDK 已正式发布，支持 stdio 和 sse 两种传输方式。
+>
+> **与主项目的关系**：MCP Server 通过 HTTP 调用主项目 API（`http://host:port`），**不直接连数据库**，因此部署上完全解耦。
+
+---
+
+## Proposed Changes
+
+### MCP Server Package
+
+#### [NEW] `mcp_server/` (新目录)
+
+整体目录结构：
+
+```
+mcp_server/
+├── __init__.py
+├── server.py           # 入口：注册工具，启动 MCP server
+├── config.py           # 读取 config.toml
+├── http_client.py      # httpx 异步客户端封装
+├── config.toml         # 独立配置文件（不使用环境变量）
+├── pyproject.toml      # 包声明
+├── requirements.txt    # 依赖
+├── README.md           # 独立部署说明
+└── tools/
+    ├── __init__.py
+    ├── categories.py   # 分类查询与管理
+    ├── standards.py    # 数据标准查询与管理
+    ├── search.py       # 搜索（关键词 + 向量，两个独立工具）
+    ├── code_lists.py   # 码表查询与管理
+    └── relations.py    # 标准关系管理
+```
+
+---
+
+#### [NEW] [config.toml](file:///c:/Users/Griffin/Desktop/CursorProjects/dsms/mcp_server/config.toml)
+
+```toml
+[api]
+base_url = "http://127.0.0.1:8000"
+timeout_seconds = 30
+
+[server]
+name = "dsms-mcp-server"
+version = "0.1.0"
+default_language = "zh"
+```
+
+---
+
+#### [NEW] [config.py](file:///c:/Users/Griffin/Desktop/CursorProjects/dsms/mcp_server/config.py)
+
+使用 `tomllib`（Python 3.11+ 标准库）读取 `config.toml`，提供全局 [Settings](file:///c:/Users/Griffin/Desktop/CursorProjects/dsms/app/config.py#6-32) 对象，不涉及任何环境变量。
+
+---
+
+#### [NEW] [http_client.py](file:///c:/Users/Griffin/Desktop/CursorProjects/dsms/mcp_server/http_client.py)
+
+基于 `httpx.AsyncClient` 封装：
+- [get(path, params)](file:///c:/Users/Griffin/Desktop/CursorProjects/dsms/app/config.py#34-38) / `post(path, json)` / [put](file:///c:/Users/Griffin/Desktop/CursorProjects/dsms/app/routers/code_lists.py#498-535) / `patch` / [delete](file:///c:/Users/Griffin/Desktop/CursorProjects/dsms/app/routers/categories.py#271-318)
+- 统一处理非 2xx 响应，返回结构化错误信息给 LLM
+
+---
+
+#### [NEW] [tools/search.py](file:///c:/Users/Griffin/Desktop/CursorProjects/dsms/mcp_server/tools/search.py)
+
+提供**两个独立工具**，这是工具设计的重点：
+
+| 工具名 | 用途 | 典型场景 |
+|---|---|---|
+| `keyword_search_standards` | 关键词检索（ILIKE，精确匹配） | 已知标准名称/编码，快速定位；代码审查时查特定标准是否存在 |
+| `vector_search_standards` | 向量语义检索（cosine similarity） | 描述模糊需求查近似标准；分析现有标准覆盖范围；内容相似度排查 |
+
+工具描述将明确说明：
+- 关键词搜索：适合"精确定位"，需要知道名称/代码片段，返回完全匹配；不依赖 embedding 服务
+- 向量搜索：适合"语义近似"，用自然语言描述需求；依赖 LM Studio embedding 服务在线；返回 score 相似度分
+
+---
+
+#### [NEW] [tools/standards.py](file:///c:/Users/Griffin/Desktop/CursorProjects/dsms/mcp_server/tools/standards.py)
+
+工具列表（含调用顺序提示）：
+
+| 工具 | 说明 |
+|---|---|
+| `list_standards` | 分页枚举标准（含过滤），建议先用搜索工具定位 |
+| [get_standard_detail](file:///c:/Users/Griffin/Desktop/CursorProjects/dsms/app/routers/standards.py#233-273) | 按 ID 查详情（含多语言、绑定码表）|
+| `get_standard_history` | 查标准历史版本列表 |
+| [create_standard](file:///c:/Users/Griffin/Desktop/CursorProjects/dsms/app/routers/standards.py#95-149) | 创建草稿标准（需先确认分类 ID） |
+| [update_standard](file:///c:/Users/Griffin/Desktop/CursorProjects/dsms/app/routers/standards.py#275-331) | 更新草稿/退役标准内容 |
+| [publish_standard](file:///c:/Users/Griffin/Desktop/CursorProjects/dsms/app/routers/standards.py#408-441) | 发布标准（需标准处于草稿状态） |
+| [update_standard_status](file:///c:/Users/Griffin/Desktop/CursorProjects/dsms/app/routers/standards.py#443-474) | 直接更新状态（0-4） |
+| [create_standard_revision](file:///c:/Users/Griffin/Desktop/CursorProjects/dsms/app/routers/standards.py#362-406) | 基于现有标准创建新版本 |
+| [delete_standard](file:///c:/Users/Griffin/Desktop/CursorProjects/dsms/app/routers/standards.py#333-360) | 软删除标准 |
+| `bind_standard_codelist` | 绑定/解绑码表（需先查到可用码表 ID） |
+| `get_standard_codelist_binding` | 查当前绑定码表详情 |
+
+---
+
+#### [NEW] [tools/categories.py](file:///c:/Users/Griffin/Desktop/CursorProjects/dsms/mcp_server/tools/categories.py)
+
+| 工具 | 说明 |
+|---|---|
+| [list_categories](file:///c:/Users/Griffin/Desktop/CursorProjects/dsms/app/routers/categories.py#106-168) | 分页/关键词查分类 |
+| [create_category](file:///c:/Users/Griffin/Desktop/CursorProjects/dsms/app/routers/categories.py#170-205) | 创建分类 |
+| [update_category](file:///c:/Users/Griffin/Desktop/CursorProjects/dsms/app/routers/categories.py#207-269) | 更新分类 |
+| [delete_category](file:///c:/Users/Griffin/Desktop/CursorProjects/dsms/app/routers/categories.py#271-318) | 软删除分类 |
+
+---
+
+#### [NEW] [tools/code_lists.py](file:///c:/Users/Griffin/Desktop/CursorProjects/dsms/mcp_server/tools/code_lists.py)
+
+| 工具 | 说明 |
+|---|---|
+| `list_code_lists` | 分页查码表 |
+| [search_code_lists](file:///c:/Users/Griffin/Desktop/CursorProjects/dsms/app/routers/code_lists.py#103-139) | 关键词搜索码表（主表+子项） |
+| [get_code_list_detail](file:///c:/Users/Griffin/Desktop/CursorProjects/dsms/app/routers/code_lists.py#221-258) | 查码表详情（含子项） |
+| [get_code_list_items](file:///c:/Users/Griffin/Desktop/CursorProjects/dsms/app/routers/code_lists.py#471-496) | 分页查码表子项 |
+| [create_code_list](file:///c:/Users/Griffin/Desktop/CursorProjects/dsms/app/routers/code_lists.py#52-101) | 创建码表 |
+| [update_code_list](file:///c:/Users/Griffin/Desktop/CursorProjects/dsms/app/routers/code_lists.py#260-301) | 更新草稿码表主表 |
+| `replace_code_list_items` | 批量替换子项（仅草稿可用） |
+| [publish_code_list](file:///c:/Users/Griffin/Desktop/CursorProjects/dsms/app/routers/code_lists.py#403-436) | 发布码表 |
+| `create_code_list_revision` | 创建码表新版本 |
+| [delete_code_list](file:///c:/Users/Griffin/Desktop/CursorProjects/dsms/app/routers/code_lists.py#303-355) | 软删除码表 |
+| [get_code_list_bindings](file:///c:/Users/Griffin/Desktop/CursorProjects/dsms/app/routers/code_lists.py#183-219) | 查哪些标准引用此码表 |
+| `get_code_list_history` | 查码表历史版本 |
+
+---
+
+#### [NEW] [tools/relations.py](file:///c:/Users/Griffin/Desktop/CursorProjects/dsms/mcp_server/tools/relations.py)
+
+| 工具 | 说明 |
+|---|---|
+| `list_standard_relations` | 查标准出入度关系 |
+| `create_standard_relation` | 创建关系 |
+| `delete_standard_relation` | 删除关系 |
+
+---
+
+#### [NEW] [server.py](file:///c:/Users/Griffin/Desktop/CursorProjects/dsms/mcp_server/server.py)
+
+- 使用 `mcp.server.fastmcp.FastMCP` 创建 server 实例
+- 注册所有 tool 函数
+- `if __name__ == "__main__": mcp.run()` 启动 stdio 传输
+
+---
+
+#### [NEW] [requirements.txt](file:///c:/Users/Griffin/Desktop/CursorProjects/dsms/mcp_server/requirements.txt)
+
+```
+mcp[cli]>=1.0.0
+httpx>=0.27.0
+tomli>=2.0.0   # Python < 3.11 兼容；3.11+ 使用内置 tomllib
+```
+
+---
+
+#### [MODIFY] [README.md](file:///c:/Users/Griffin/Desktop/CursorProjects/dsms/README.md)
+
+在现有 README 末尾追加 MCP Server 章节，说明：
+- MCP server 位置与功能
+- 安装依赖方式
+- 配置 `config.toml`
+- 启动命令
+- 如何在 Claude Desktop / Cursor 中配置使用
+
+---
+
+## Verification Plan
+
+### 语法与导入检查（自动）
+
+在 `mcp_server/` 目录运行：
+
+```bash
+# 检查所有文件无语法错误
+python -m py_compile mcp_server/__init__.py mcp_server/config.py mcp_server/http_client.py mcp_server/server.py mcp_server/tools/categories.py mcp_server/tools/standards.py mcp_server/tools/search.py mcp_server/tools/code_lists.py mcp_server/tools/relations.py
+```
+
+### 工具列表检查（手动）
+
+安装依赖后，使用 MCP inspector 或 CLI 验证工具注册：
+
+```bash
+cd mcp_server
+pip install -r requirements.txt
+# 查看已注册工具列表
+python -m mcp dev server.py
+```
+
+打开 inspector UI，确认所有工具名称、参数描述均正确显示。
+
+### 端对端调用测试（手动，需 DSMS API 在线）
+
+启动 DSMS API 后，通过 MCP inspector 测试核心工具：
+1. [list_categories](file:///c:/Users/Griffin/Desktop/CursorProjects/dsms/app/routers/categories.py#106-168) — 应返回分类列表
+2. `keyword_search_standards` — 传入关键词，确认返回标准列表
+3. `vector_search_standards` — 传入自然语言描述，确认返回语义匹配结果
+4. [get_standard_detail](file:///c:/Users/Griffin/Desktop/CursorProjects/dsms/app/routers/standards.py#233-273) — 传入有效 standard_id，确认返回详情
+
+> [!NOTE]
+> 向量搜索需要 LM Studio embedding 服务在线（配置在 DSMS API 的 .env 中），其他工具无需 embedding 服务。
